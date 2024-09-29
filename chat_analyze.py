@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from config.base_config import BaseConfig
+from utils.logger import ChatLogger
+
+logger = ChatLogger()
 
 
 class ChatAnalyzer:
@@ -13,8 +16,10 @@ class ChatAnalyzer:
     """
     date_time_format: str = BaseConfig.DATE_TIME_FORMAT
     chat_file_path: str = BaseConfig.CHAT_FILE_PATH
+    pattern: str = BaseConfig.PATTERN
+    weight_pattern: str = BaseConfig.WEIGHT_PATTERN
 
-    def parse_chat(self, file_path):
+    def parse_chat(self):
         """
         Parses the WhatsApp chat export file.
 
@@ -25,12 +30,11 @@ class ChatAnalyzer:
             pd.DataFrame: DataFrame containing datetime, user, and message.
         """
         # Updated regex pattern to match the new format
-        pattern = r'^\[(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}:\d{2})\]\s([^:]+):\s(.*)'
         messages = []
-        with open(file_path, 'r', encoding='utf-8') as file:
+        with open(self.chat_file_path, 'r', encoding='utf-8') as file:
             for line in file:
                 line = line.strip()
-                match = re.match(pattern, line)
+                match = re.match(self.pattern, line)
                 if match:
                     date_str = f"{match.group(1)}, {match.group(2)}"
                     try:
@@ -47,7 +51,8 @@ class ChatAnalyzer:
             df = pd.DataFrame(messages)
         return df
 
-    def analyze_workouts(self, df: pd.DataFrame):
+    @staticmethod
+    def analyze_workouts(df: pd.DataFrame):
         """
         Analyzes workout entries in the DataFrame.
 
@@ -72,20 +77,22 @@ class ChatAnalyzer:
         Returns:
             pd.DataFrame: DataFrame with average weights per week per user.
         """
-        weight_pattern = r'average weight[:\-]?\s*(\d+\.?\d*)'
+
         weights = []
         for _, row in df.iterrows():
-            match = re.search(weight_pattern, row['message'], re.IGNORECASE)
+            match = re.search(self.weight_pattern, row['message'], re.IGNORECASE)
             if match:
-                weight = float(match.group(1))
+                weight = float(match.group(0))
                 week = row['datetime'].isocalendar()[1]
                 year = row['datetime'].year
                 weights.append({'year': year, 'week': week, 'user': row['user'], 'weight': weight})
         weight_df = pd.DataFrame(weights)
+        weight_df = weight_df[weight_df['weight'] > 80]
         weight_df = weight_df.groupby(['user', 'year', 'week']).mean().reset_index()
         return weight_df
 
-    def plot_workouts(self, workout_df: pd.DataFrame):
+    @staticmethod
+    def plot_workouts(workout_df: pd.DataFrame):
         """
         Plots the workout days per user.
 
@@ -103,7 +110,8 @@ class ChatAnalyzer:
             plt.tight_layout()
             plt.show()
 
-    def plot_weights(self, weight_df: pd.DataFrame):
+    @staticmethod
+    def plot_weights(weight_df: pd.DataFrame):
         """
         Plots the average weekly weights per user.
 
@@ -125,17 +133,15 @@ class ChatAnalyzer:
 
     def flow(self):
         # Parse the chat file
-        df = self.parse_chat(self.chat_file_path)
+        df = self.parse_chat()
 
         # Analyze workouts
         workout_df = self.analyze_workouts(df)
-        print("Workout Analysis:")
-        print(workout_df)
+        logger.info("Workout Analysis:")
 
         # Analyze weights
         weight_df = self.analyze_weights(df)
-        print("\nWeight Analysis:")
-        print(weight_df)
+        logger.info("Weight Analysis")
 
         # Plot the workouts
         self.plot_workouts(workout_df)
