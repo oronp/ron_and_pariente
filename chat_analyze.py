@@ -137,11 +137,11 @@ class ChatAnalyzer:
 
         # Analyze workouts
         workout_df = self.analyze_workouts(df)
-        logger.info("Workout Analysis:")
+        logger.info("Workout Analysis finished")
 
         # Analyze weights
         weight_df = self.analyze_weights(df)
-        logger.info("Weight Analysis")
+        logger.info("Weight Analysis finished")
 
         # Plot the workouts
         self.plot_workouts(workout_df)
